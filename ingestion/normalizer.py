@@ -52,6 +52,39 @@ def tag_job(title: str, jd: str) -> list[str]:
     return tags
 
 
+# Experience-level patterns (checked in order — most specific first)
+_EXPERIENCE_PATTERNS = [
+    # Entry / Junior / Fresher
+    ("entry", [
+        r"\bentry[- ]level\b", r"\bjunior\b", r"\bjr\.?\b",
+        r"\bfresher\b", r"\bgraduate\b", r"\b0[- ]?(?:to|[-–])[- ]?[12][- ]?year",
+        r"\bno experience\b", r"\bnew grad\b",
+    ]),
+    # Senior / Lead / Principal / Staff
+    ("senior", [
+        r"\bsenior\b", r"\bsr\.?\b", r"\blead\b", r"\bprincipal\b",
+        r"\bstaff\b", r"\bhead of\b", r"\bdirector\b",
+        r"\b[5-9][- ]?(?:to|[-–])[- ]?\d+[- ]?year",
+        r"\b\d{2,}[- ]?(?:to|[-–])[- ]?\d+[- ]?year",
+    ]),
+    # Mid-level (explicit markers only — avoid false positives)
+    ("mid", [
+        r"\bmid[- ]level\b", r"\bintermediate\b", r"\bassociate\b",
+        r"\b[23][- ]?(?:to|[-–])[- ]?[45][- ]?year",
+        r"\b[23]\+[- ]?years\b",
+    ]),
+]
+
+
+def extract_experience(title: str, jd: str) -> str | None:
+    """Return 'entry', 'mid', or 'senior'; None if undetermined."""
+    text = (title + " " + jd).lower()
+    for level, patterns in _EXPERIENCE_PATTERNS:
+        if any(re.search(p, text) for p in patterns):
+            return level
+    return None
+
+
 def _parse_date(raw) -> str | None:
     if not raw:
         return None
@@ -76,6 +109,7 @@ def normalize_arbeitnow(raw: dict) -> dict:
         "apply_url": raw.get("url", ""),
         "tags": tag_job(title, jd),
         "role_category": categorize(title, jd),
+        "experience_level": extract_experience(title, jd),
         "source_id": str(raw.get("slug", "")),
     }
 
@@ -93,6 +127,7 @@ def normalize_remoteok(raw: dict) -> dict:
         "apply_url": raw.get("url", ""),
         "tags": tag_job(title, jd) + ["remote"],
         "role_category": categorize(title, jd),
+        "experience_level": extract_experience(title, jd),
         "source_id": str(raw.get("id", "")),
     }
 
@@ -111,6 +146,7 @@ def normalize_adzuna(raw: dict) -> dict:
         "apply_url": raw.get("redirect_url", ""),
         "tags": tag_job(title, jd),
         "role_category": categorize(title, jd),
+        "experience_level": extract_experience(title, jd),
         "source_id": str(raw.get("id", "")),
     }
 
@@ -134,6 +170,7 @@ def normalize_jooble(raw: dict) -> dict:
         "apply_url": raw.get("link", ""),
         "tags": tag_job(title, jd),
         "role_category": categorize(title, jd),
+        "experience_level": extract_experience(title, jd),
         "source_id": str(raw.get("id", "")),
     }
 

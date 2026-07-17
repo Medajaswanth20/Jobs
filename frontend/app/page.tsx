@@ -24,6 +24,13 @@ const DATE_OPTIONS = [
   { label: "Last 30 days",value: 30 },
 ];
 
+const EXPERIENCE_OPTIONS = [
+  { label: "All Levels",  value: "" },
+  { label: "🌱 Entry Level", value: "entry" },
+  { label: "🔶 Mid Level",  value: "mid" },
+  { label: "🚀 Senior",     value: "senior" },
+];
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const d = Math.floor(diff / 86400000);
@@ -70,6 +77,8 @@ function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
     ? job.jd_text.replace(/<[^>]+>/g, " ").slice(0, 200).trim()
     : "";
 
+  const expLabel: Record<string, string> = { entry: "🌱 Entry", mid: "🔶 Mid", senior: "🚀 Senior" };
+
   return (
     <article className="job-card" onClick={onClick} tabIndex={0}
       onKeyDown={e => e.key === "Enter" && onClick()}>
@@ -102,6 +111,11 @@ function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
             {timeAgo(job.posted_date)}
+          </span>
+        )}
+        {job.experience_level && (
+          <span className="card-meta-item" style={{ fontWeight: 600 }}>
+            {expLabel[job.experience_level] ?? job.experience_level}
           </span>
         )}
       </div>
@@ -195,6 +209,7 @@ export default function HomePage() {
   const [days, setDays] = useState(0);
   const [locationFilter, setLocationFilter] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [experience, setExperience] = useState("");
 
   const search = useDebounce(searchRaw, 400);
   const PAGE_SIZE = 20;
@@ -209,6 +224,7 @@ export default function HomePage() {
       if (days) filters.days = days;
       if (locationFilter) filters.location = locationFilter;
       if (remoteOnly) filters.remote = true;
+      if (experience) filters.experience = experience;
       const { jobs: data, total: count } = await fetchJobs(filters);
       setJobs(data);
       setTotal(count);
@@ -217,21 +233,21 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [search, role, days, locationFilter, remoteOnly]);
+  }, [search, role, days, locationFilter, remoteOnly, experience]);
 
   useEffect(() => {
     setPage(1);
     load(1);
-  }, [search, role, days, locationFilter, remoteOnly]);  // eslint-disable-line
+  }, [search, role, days, locationFilter, remoteOnly, experience]);  // eslint-disable-line
 
   useEffect(() => {
     if (page !== 1) load(page);
   }, [page]);  // eslint-disable-line
 
-  const hasFilters = !!(search || role || days || locationFilter || remoteOnly);
+  const hasFilters = !!(search || role || days || locationFilter || remoteOnly || experience);
 
   function clearFilters() {
-    setSearchRaw(""); setRole(""); setDays(0); setLocationFilter(""); setRemoteOnly(false);
+    setSearchRaw(""); setRole(""); setDays(0); setLocationFilter(""); setRemoteOnly(false); setExperience("");
   }
 
   return (
@@ -286,6 +302,13 @@ export default function HomePage() {
             <option value="">All Roles</option>
             {Object.entries(ROLE_LABELS).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
+
+          <select id="experience-filter" className="filter-select" value={experience}
+            onChange={e => setExperience(e.target.value)} aria-label="Filter by experience level">
+            {EXPERIENCE_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
 

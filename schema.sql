@@ -15,6 +15,7 @@ create table if not exists jobs (
   apply_url     text,
   tags          text[],         -- ['remote','sql','python',...]
   role_category text,           -- 'data-analyst' | 'data-integrity' | 'data-engineer' | etc.
+  experience_level text,        -- 'entry' | 'mid' | 'senior' | NULL
   source_id     text,           -- original ID from source API
   hash          text unique not null,  -- sha256(company+title+location) for dedup
   is_active     boolean default true,
@@ -23,11 +24,12 @@ create table if not exists jobs (
 );
 
 -- 2. Indexes for performance
-create index if not exists jobs_posted_date_idx   on jobs (posted_date desc);
-create index if not exists jobs_role_category_idx on jobs (role_category);
-create index if not exists jobs_is_active_idx     on jobs (is_active);
-create index if not exists jobs_source_idx        on jobs (source);
-create index if not exists jobs_search_gin_idx    on jobs using gin(search_vector);
+create index if not exists jobs_posted_date_idx      on jobs (posted_date desc);
+create index if not exists jobs_role_category_idx    on jobs (role_category);
+create index if not exists jobs_experience_level_idx on jobs (experience_level);
+create index if not exists jobs_is_active_idx        on jobs (is_active);
+create index if not exists jobs_source_idx           on jobs (source);
+create index if not exists jobs_search_gin_idx       on jobs using gin(search_vector);
 create index if not exists jobs_tags_gin_idx      on jobs using gin(tags);
 
 -- 3. Auto-update full-text search vector on insert/update
