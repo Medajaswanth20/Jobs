@@ -1,6 +1,8 @@
 # DataJobs — Legal Job Aggregation Platform
 
-A real-time job board for data professionals. Aggregates listings from public job APIs (Adzuna, Arbeitnow, RemoteOK), stores them in Supabase, and serves them through a modern Next.js frontend.
+A real-time job board for data professionals. Aggregates listings from **5 public job APIs** (Adzuna, Arbeitnow, RemoteOK, Jooble, SerpAPI/Google Jobs), stores them in Supabase, and serves them through a modern Next.js frontend.
+
+> **Live sources include Naukri, LinkedIn, Indeed, and Glassdoor** via SerpAPI's Google Jobs index.
 
 ---
 
@@ -20,7 +22,9 @@ job-aggregator/
 │   └── sources/
 │       ├── arbeitnow.py        ← Free, no key required
 │       ├── remoteok.py         ← Free, no key required
-│       └── adzuna.py           ← Free tier (requires APP_ID + APP_KEY)
+│       ├── adzuna.py           ← Free tier (requires APP_ID + APP_KEY)
+│       ├── jooble.py           ← Free tier (requires JOOBLE_API_KEY)
+│       └── serpapi.py          ← Google Jobs: Naukri, LinkedIn, Indeed, Glassdoor
 ├── frontend/                   ← Next.js 14 app
 │   ├── app/
 │   │   ├── layout.tsx
@@ -54,13 +58,28 @@ npm run dev
 cd ingestion
 pip install -r requirements.txt
 
-# Set env vars (Windows PowerShell)
-$env:SUPABASE_URL="https://xxx.supabase.co"
-$env:SUPABASE_SERVICE_KEY="your-service-role-key"
-# Optional (for Adzuna):
-$env:ADZUNA_APP_ID="your-app-id"
-$env:ADZUNA_APP_KEY="your-app-key"
+# Copy and fill in your keys
+cp .env.example .env
+```
 
+Edit `.env`:
+```env
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=your-service-role-key
+
+# Adzuna (free tier) — https://developer.adzuna.com
+ADZUNA_APP_ID=your-app-id
+ADZUNA_APP_KEY=your-app-key
+
+# Jooble (free) — https://jooble.org/api/about
+JOOBLE_API_KEY=your-jooble-key
+
+# SerpAPI (100 searches/month free) — https://serpapi.com
+SERPAPI_KEY=your-serpapi-key
+```
+
+Then run:
+```bash
 python main.py
 ```
 
@@ -69,9 +88,24 @@ python main.py
 2. Go to **Settings → Secrets → Actions** and add:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_KEY`
-   - `ADZUNA_APP_ID` (optional)
-   - `ADZUNA_APP_KEY` (optional)
-3. The workflow runs every 4 hours automatically. Trigger it manually via **Actions → Job Ingestion → Run workflow**
+   - `ADZUNA_APP_ID`
+   - `ADZUNA_APP_KEY`
+   - `JOOBLE_API_KEY`
+   - `SERPAPI_KEY`
+3. The workflow runs every 4 hours automatically.  
+   Trigger it manually via **Actions → Job Ingestion → Run workflow**
+
+---
+
+## API Sources
+
+| Source | Key Required | Coverage | Free Tier |
+|---|---|---|---|
+| [Arbeitnow](https://www.arbeitnow.com/api) | No | EU-focused | Unlimited |
+| [RemoteOK](https://remoteok.com/api) | No | Global remote | Unlimited |
+| [Adzuna](https://developer.adzuna.com) | Yes | IN, GB, US | 250 req/month |
+| [Jooble](https://jooble.org/api/about) | Yes | India + Global | Generous free tier |
+| [SerpAPI](https://serpapi.com/google-jobs-api) | Yes | **Naukri, LinkedIn, Indeed, Glassdoor** | 100 searches/month |
 
 ---
 
@@ -85,16 +119,6 @@ python main.py
 | `business-analyst` | business analyst, bi analyst, reporting analyst |
 | `data-scientist` | data scientist, ml engineer, machine learning |
 | `data-analyst` | data analyst, analyst (broad catch-all) |
-
----
-
-## API Sources
-
-| Source | Key Required | Coverage | Notes |
-|---|---|---|---|
-| [Arbeitnow](https://www.arbeitnow.com/api) | No | EU-focused | Free, paginated |
-| [RemoteOK](https://remoteok.com/api) | No | Global remote | Free, rate-limited |
-| [Adzuna](https://developer.adzuna.com) | Yes (free tier) | IN, GB, US | 250 req/month free |
 
 ---
 
