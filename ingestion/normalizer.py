@@ -175,9 +175,90 @@ def normalize_jooble(raw: dict) -> dict:
     }
 
 
+def normalize_serpapi(raw: dict) -> dict:
+    """Normalize a SerpAPI Google Jobs result dict."""
+    title = raw.get("title", "")
+    # SerpAPI returns description in highlights or as a plain snippet
+    jd = raw.get("description", "")
+    if not jd:
+        # fallback: join highlights snippets
+        highlights = raw.get("job_highlights", [])
+        jd = " ".join(
+            item for h in highlights for item in h.get("items", [])
+        )
+
+    location = raw.get("location", "")
+    extensions = raw.get("detected_extensions", {})
+
+    # Work type / schedule
+    schedule = extensions.get("schedule_type", "")
+    if "remote" in schedule.lower() or "remote" in location.lower():
+        if "remote" not in location.lower():
+            location = (location + " (Remote)") if location else "Remote"
+
+    # Best apply link: prefer direct apply, then first option
+    apply_url = ""
+    apply_options = raw.get("apply_options", [])
+    direct = [o for o in apply_options if o.get("title", "").lower() == "direct apply"]
+    if direct:
+        apply_url = direct[0].get("link", "")
+    elif apply_options:
+        apply_url = apply_options[0].get("link", "")
+
+    posted_raw = extensions.get("posted_at") or extensions.get("date_posted")
+
+    return {
+        "title":            title,
+        "company":          raw.get("company_name", ""),
+        "location":         location,
+        "jd_text":          jd,
+        "posted_date":      _parse_date(posted_raw),
+        "source":           "serpapi",
+        "apply_url":        apply_url,
+        "tags":             tag_job(title, jd),
+        "role_category":    categorize(title, jd),
+        "experience_level": extract_experience(title, jd),
+        "source_id":        str(raw.get("job_id", "")),
+    }
+
+
+def normalize_jsearch(raw: dict) -> dict:
+    """Normalize a JSearch (Google Jobs / RapidAPI) job dict."""
+    title = raw.get("job_title", "")
+    jd    = re.sub(r"<[^>]+>", " ", raw.get("job_description", ""))  # strip any HTML
+
+    # Build location string from structured fields
+    city    = raw.get("job_city", "")
+    state   = raw.get("job_state", "")
+    country = raw.get("job_country", "")
+    location_parts = [p for p in [city, state, country] if p]
+    location = ", ".join(location_parts)
+
+    # JSearch explicitly flags remote jobs
+    is_remote = raw.get("job_is_remote", False)
+    if is_remote:
+        location = (location + " (Remote)") if location else "Remote"
+
+    return {
+        "title":            title,
+        "company":          raw.get("employer_name", ""),
+        "location":         location,
+        "jd_text":          jd,
+        "posted_date":      _parse_date(raw.get("job_posted_at_datetime_utc")),
+        "source":           "jsearch",
+        "apply_url":        raw.get("job_apply_link", ""),
+        "tags":             tag_job(title, jd),
+        "role_category":    categorize(title, jd),
+        "experience_level": extract_experience(title, jd),
+        "source_id":        str(raw.get("job_id", "")),
+    }
+
+
 NORMALIZERS = {
     "arbeitnow": normalize_arbeitnow,
     "remoteok":  normalize_remoteok,
     "adzuna":    normalize_adzuna,
     "jooble":    normalize_jooble,
+    "jsearch":   normalize_jsearch,   # kept for reference; disabled in main.py
+    "serpapi":   normalize_serpapi,
 }

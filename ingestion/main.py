@@ -11,7 +11,7 @@ try:
 except ImportError:
     pass
 
-from sources import arbeitnow, remoteok, adzuna, jooble
+from sources import arbeitnow, remoteok, adzuna, jooble, serpapi
 from normalizer import NORMALIZERS
 from deduper import compute_hash, dedupe_batch
 from upserter import get_existing_hashes, upsert_jobs, expire_old_jobs
@@ -21,6 +21,7 @@ SOURCES = [
     ("remoteok",  remoteok.fetch_jobs),
     ("adzuna",    adzuna.fetch_jobs),
     ("jooble",    jooble.fetch_jobs),
+    ("serpapi",   serpapi.fetch_jobs),  # Google Jobs → Naukri, LinkedIn, Indeed
 ]
 
 
