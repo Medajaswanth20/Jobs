@@ -655,8 +655,8 @@ export default function HomePage() {
       <header className="header">
         <div className="container header-inner">
           <span className="logo">
-            <span className="logo-dot" />
-            DataJobs
+            <img src="/logo.png" alt="Job Hub Logo" style={{ height: 32, width: 32, borderRadius: 6, objectFit: "cover" }} />
+            Job Hub
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <span className="header-meta">{total.toLocaleString()} listings · updated every 4h</span>
@@ -855,7 +855,7 @@ export default function HomePage() {
       {/* ── Footer ── */}
       <footer className="footer">
         <div className="container">
-          ⚡ DataJobs · Sources: Adzuna, Arbeitnow, RemoteOK, Jooble, SerpAPI ·{" "}
+          ⚡ Job Hub · Sources: Adzuna, Arbeitnow, RemoteOK, Jooble, SerpAPI ·{" "}
           <span style={{ color: "var(--text-muted)" }}>Updated every 4 hours</span>
         </div>
       </footer>

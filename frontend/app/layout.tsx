@@ -5,13 +5,13 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "DataJobs — Data Analyst & Engineer Job Board",
+  title: "Job Hub — Data & DevOps Job Board",
   description:
-    "Curated, real-time job board for data professionals. Find data analyst, data integrity, data engineer, and analytics engineer roles — updated every 4 hours from top job APIs.",
-  keywords: "data analyst jobs, data engineer jobs, data integrity jobs, analytics engineer, remote data jobs",
+    "Curated, real-time job board for data and DevOps professionals. Find data analyst, data integrity, data engineer, DevOps, site reliability, and cloud engineer roles.",
+  keywords: "data analyst jobs, data engineer jobs, DevOps engineer jobs, SRE, cloud engineer, remote jobs",
   openGraph: {
-    title: "DataJobs — Data Analyst & Engineer Job Board",
-    description: "Curated real-time job board for data professionals.",
+    title: "Job Hub — Data & DevOps Job Board",
+    description: "Curated real-time job board for data and DevOps professionals.",
     type: "website",
   },
 };
