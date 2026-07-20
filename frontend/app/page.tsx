@@ -135,22 +135,20 @@ function useDebounce<T>(value: T, delay: number): T {
 function SkeletonCard() {
   return (
     <div className="job-card" style={{ pointerEvents: "none" }}>
-      <div className="card-top">
-        <div className="skeleton" style={{ width: 44, height: 44, borderRadius: 12 }} />
-        <div style={{ flex: 1 }}>
-          <div className="skeleton" style={{ height: 16, width: "70%", marginBottom: 8 }} />
-          <div className="skeleton" style={{ height: 13, width: "40%" }} />
-        </div>
+      <div className="skeleton" style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0 }} />
+      <div className="card-body" style={{ flex: 1 }}>
+        <div className="skeleton" style={{ height: 16, width: "65%", marginBottom: 8 }} />
+        <div className="skeleton" style={{ height: 13, width: "40%", marginBottom: 12 }} />
+        <div className="skeleton" style={{ height: 13, width: "100%", marginBottom: 6 }} />
+        <div className="skeleton" style={{ height: 13, width: "80%" }} />
       </div>
-      <div className="skeleton" style={{ height: 13, width: "100%", marginBottom: 6 }} />
-      <div className="skeleton" style={{ height: 13, width: "80%" }} />
     </div>
   );
 }
 
 function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
   const snippet = job.jd_text
-    ? job.jd_text.replace(/<[^>]+>/g, " ").slice(0, 200).trim()
+    ? job.jd_text.replace(/<[^>]+>/g, " ").slice(0, 220).trim()
     : "";
 
   const expLabel: Record<string, string> = {
@@ -159,56 +157,84 @@ function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
     senior: "🚀 Senior · 5+ yrs",
   };
 
+  const avatarHue = (job.company.charCodeAt(0) * 47) % 360;
+
   return (
     <article className="job-card" onClick={onClick} tabIndex={0}
       onKeyDown={e => e.key === "Enter" && onClick()}>
-      <div className="card-top">
-        <div className="card-company-initial"
-          style={{
-            background: `hsl(${(job.company.charCodeAt(0) * 47) % 360}, 70%, 55%) linear-gradient(135deg, transparent, rgba(0,0,0,0.2))`
-          }}>
-          {companyInitial(job.company)}
-        </div>
-        <div className="card-header">
-          <h2 className="card-title">{job.title}</h2>
-          <div className="card-company">{job.company}</div>
-        </div>
-        <SourceChip source={job.source} applyUrl={job.apply_url} />
+
+      {/* Company Avatar */}
+      <div className="card-company-initial"
+        style={{ background: `hsl(${avatarHue}, 65%, 52%)` }}>
+        {companyInitial(job.company)}
       </div>
 
-      <div className="card-meta">
-        {job.location && (
-          <span className="card-meta-item">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-            {job.location}
-          </span>
-        )}
-        {job.posted_date && (
-          <span className="card-meta-item">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            {timeAgo(job.posted_date)}
-          </span>
-        )}
-        {job.experience_level && (
-          <span className="card-meta-item" style={{ fontWeight: 600 }}>
-            {expLabel[job.experience_level] ?? job.experience_level}
-          </span>
-        )}
-      </div>
+      {/* Card Body */}
+      <div className="card-body">
+        <div className="card-top">
+          <div className="card-header">
+            <h2 className="card-title">{job.title}</h2>
+          </div>
+          <SourceChip source={job.source} applyUrl={job.apply_url} />
+        </div>
 
-      {snippet && <p className="card-snippet">{snippet}…</p>}
+        {/* Meta row */}
+        <div className="card-meta-row">
+          <span className="card-company">{job.company}</span>
+          {job.location && (
+            <>
+              <span className="card-sep">·</span>
+              <span className="card-meta-item">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                {job.location}
+              </span>
+            </>
+          )}
+          {job.posted_date && (
+            <>
+              <span className="card-sep">·</span>
+              <span className="card-meta-item">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                {timeAgo(job.posted_date)}
+              </span>
+            </>
+          )}
+          {job.experience_level && (
+            <>
+              <span className="card-sep">·</span>
+              <span className="exp-badge">{expLabel[job.experience_level] ?? job.experience_level}</span>
+            </>
+          )}
+        </div>
 
-      <div className="card-footer">
-        <span className={`badge badge-${job.role_category}`}>
-          {ROLE_LABELS[job.role_category] || job.role_category}
-        </span>
-        {(job.tags || []).slice(0, 4).map(tag => (
-          <span key={tag} className="tag">{tag}</span>
-        ))}
+        {snippet && <p className="card-snippet">{snippet}…</p>}
+
+        {/* Footer: tags + apply button */}
+        <div className="card-footer">
+          <div className="card-tags">
+            <span className={`badge badge-${job.role_category}`}>
+              {ROLE_LABELS[job.role_category] || job.role_category}
+            </span>
+            {(job.tags || []).slice(0, 4).map(tag => (
+              <span key={tag} className="tag">{tag}</span>
+            ))}
+          </div>
+          {job.apply_url && (
+            <a
+              href={job.apply_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="apply-btn-card"
+              onClick={e => e.stopPropagation()}
+            >
+              Apply now
+            </a>
+          )}
+        </div>
       </div>
     </article>
   );
@@ -443,7 +469,7 @@ function ApplicationsModal({ onClose }: { onClose: () => void }) {
               {apps.length} application{apps.length !== 1 ? "s" : ""} tracked
             </p>
           </div>
-          <button className="detail-close" onClick={onClose} aria-label="Close modal">✕</button>
+          <button className="tracker-close-btn" style={{ width: 34, height: 34, borderRadius: "50%", padding: 0 }} onClick={onClose} aria-label="Close modal">✕</button>
         </div>
 
         {/* Table */}
@@ -489,8 +515,8 @@ function ApplicationsModal({ onClose }: { onClose: () => void }) {
                     </td>
                     <td>{app.role}</td>
                     <td style={{ whiteSpace: "nowrap" }}>{isoToDisplay(app.applied_date)}</td>
-                    <td className="td-id">{app.job_id}</td>
-                    <td className="td-resume">{app.resume_name || "—"}</td>
+                    <td className="td-id" style={{ fontFamily: "monospace", fontSize: 11 }}>{app.job_id}</td>
+                    <td className="td-resume" style={{ fontStyle: "italic" }}>{app.resume_name || "—"}</td>
                     <td>
                       <select
                         className="tracker-status-select"
@@ -628,11 +654,12 @@ export default function HomePage() {
       {/* ── Header ── */}
       <header className="header">
         <div className="container header-inner">
-          <span className="logo">⚡ DataJobs</span>
+          <span className="logo">
+            <span className="logo-dot" />
+            DataJobs
+          </span>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span className="header-meta">
-              Updated every 4 hours · {total.toLocaleString()} listings
-            </span>
+            <span className="header-meta">{total.toLocaleString()} listings · updated every 4h</span>
             <button
               id="open-tracker-btn"
               className="tracker-header-btn"
@@ -645,15 +672,17 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="container">
-        {/* ── Hero ── */}
-        <section className="hero">
-          <h1>Find Your Next <span>Data Role</span></h1>
-          <p>
-            Curated jobs for data analysts, engineers, scientists &amp; more —
-            sourced live from top job APIs, deduplicated, and updated every 4 hours.
-          </p>
-          <div className="search-wrap">
+      {/* ── Hero (full-width gradient) ── */}
+      <section className="hero-section">
+        <div className="hero-inner">
+          <h1>Find Your Next <br />Data &amp; DevOps Role</h1>
+          <p>Curated jobs for data analysts, engineers, scientists, and DevOps — sourced live, deduplicated &amp; updated every 4 hours.</p>
+          <div className="hero-search">
+            <span className="hero-search-icon">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+              </svg>
+            </span>
             <input
               id="search-input"
               type="search"
@@ -663,151 +692,170 @@ export default function HomePage() {
               onChange={e => setSearchRaw(e.target.value)}
               aria-label="Search jobs"
             />
-            <svg className="search-icon" width="18" height="18" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-            </svg>
+            <button className="hero-search-btn">Search</button>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ── Stats ── */}
-        <div className="stats-bar">
-          <span><strong>{total.toLocaleString()}</strong> active listings</span>
-          {!loading && jobs.length > 0 && (
-            <span>Showing <strong>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}</strong></span>
+      {/* ── Two-column page body ── */}
+      <div className="page-body">
+
+        {/* ── Jobs column ── */}
+        <div className="jobs-col">
+
+          {/* Results bar */}
+          <div className="results-bar">
+            <span className="results-count">
+              Showing results <strong>({total.toLocaleString()})</strong>
+              {!loading && jobs.length > 0 && (
+                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>
+                  · page {page} of {totalPages}
+                </span>
+              )}
+            </span>
+          </div>
+
+          {/* Country chips */}
+          <div className="country-chips-row">
+            <span className="country-chips-label">Country:</span>
+            {COUNTRY_CHIPS.map(c => (
+              <button
+                key={c.value}
+                id={`country-${c.value.toLowerCase().replace(/\s+/g, "-")}`}
+                className={`country-chip ${countryFilter === c.value ? "active" : ""}`}
+                onClick={() => {
+                  const next = countryFilter === c.value ? "" : c.value;
+                  setCountryFilter(next);
+                }}
+              >
+                <span className="chip-flag">{c.flag}</span>
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Job list */}
+          {loading ? (
+            <div className="job-list">
+              {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : jobs.length === 0 ? (
+            <div className="empty-state">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+              </svg>
+              <h3>No jobs found</h3>
+              <p>Try adjusting your filters or search term.</p>
+            </div>
+          ) : (
+            <div className="job-list">
+              {jobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  onClick={() => setSelectedJob(job)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <nav className="pagination" aria-label="Pagination">
+              <button id="prev-page" className="page-btn"
+                disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
+              {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                let p = i + 1;
+                if (totalPages > 7) {
+                  if (page <= 4) p = i + 1;
+                  else if (page >= totalPages - 3) p = totalPages - 6 + i;
+                  else p = page - 3 + i;
+                }
+                return (
+                  <button key={p} id={`page-${p}`}
+                    className={`page-btn ${page === p ? "active" : ""}`}
+                    onClick={() => setPage(p)}>{p}</button>
+                );
+              })}
+              <button id="next-page" className="page-btn"
+                disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+            </nav>
           )}
         </div>
 
-        {/* ── Filters ── */}
-        <div className="filter-row">
-          <select id="role-filter" className="filter-select" value={role}
-            onChange={e => setRole(e.target.value)} aria-label="Filter by role">
-            <option value="">All Roles</option>
-            {Object.entries(ROLE_LABELS).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
+        {/* ── Filter Sidebar ── */}
+        <aside className="filter-sidebar">
+          <div className="filter-panel">
+            <div className="filter-panel-header">
+              <span className="filter-panel-title">Filter</span>
+              {hasFilters && (
+                <button className="filter-reset" onClick={clearFilters}>Reset</button>
+              )}
+            </div>
 
-          <select id="experience-filter" className="filter-select" value={experience}
-            onChange={e => setExperience(e.target.value)} aria-label="Filter by experience level">
-            {EXPERIENCE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+            <div className="filter-group">
+              <label className="filter-group-label">Role</label>
+              <select id="role-filter" className="filter-select" value={role}
+                onChange={e => setRole(e.target.value)} aria-label="Filter by role">
+                <option value="">All Roles</option>
+                {Object.entries(ROLE_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
 
-          <select id="date-filter" className="filter-select" value={days}
-            onChange={e => setDays(Number(e.target.value))} aria-label="Filter by date">
-            {DATE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+            <div className="filter-group">
+              <label className="filter-group-label">Experience level</label>
+              <select id="experience-filter" className="filter-select" value={experience}
+                onChange={e => setExperience(e.target.value)} aria-label="Filter by experience level">
+                {EXPERIENCE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
 
-          <input
-            id="location-filter"
-            type="text"
-            className="filter-select"
-            placeholder="Location…"
-            value={locationFilter}
-            onChange={e => setLocationFilter(e.target.value)}
-            style={{ width: 140 }}
-            aria-label="Filter by location"
-          />
+            <div className="filter-group">
+              <label className="filter-group-label">Date posted</label>
+              <select id="date-filter" className="filter-select" value={days}
+                onChange={e => setDays(Number(e.target.value))} aria-label="Filter by date">
+                {DATE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
 
-          <button
-            id="remote-toggle"
-            className={`filter-toggle ${remoteOnly ? "active" : ""}`}
-            onClick={() => setRemoteOnly(v => !v)}
-          >
-            🌍 Remote only
-          </button>
-
-          {hasFilters && (
-            <button id="clear-filters" className="filter-clear" onClick={clearFilters}>
-              Clear filters
-            </button>
-          )}
-        </div>
-
-        {/* ── Country chips ── */}
-        <div className="country-chips-row">
-          <span className="country-chips-label">Country:</span>
-          {COUNTRY_CHIPS.map(c => (
-            <button
-              key={c.value}
-              id={`country-${c.value.toLowerCase().replace(/\s+/g, "-")}`}
-              className={`country-chip ${countryFilter === c.value ? "active" : ""}`}
-              onClick={() => {
-                const next = countryFilter === c.value ? "" : c.value;
-                setCountryFilter(next);
-                // Do NOT touch locationFilter — country uses a separate precise query
-              }}
-
-            >
-              <span className="chip-flag">{c.flag}</span>
-              {c.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Job Grid ── */}
-        {loading ? (
-          <div className="job-grid">
-            {Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)}
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="empty-state">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-            </svg>
-            <h3>No jobs found</h3>
-            <p>Try adjusting your filters or search term.</p>
-          </div>
-        ) : (
-          <div className="job-grid">
-            {jobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                onClick={() => setSelectedJob(job)}
+            <div className="filter-group">
+              <label className="filter-group-label">Location</label>
+              <input
+                id="location-filter"
+                type="text"
+                className="filter-location-input"
+                placeholder="City, state or country…"
+                value={locationFilter}
+                onChange={e => setLocationFilter(e.target.value)}
+                aria-label="Filter by location"
               />
-            ))}
-          </div>
-        )}
+            </div>
 
-        {/* ── Pagination ── */}
-        {totalPages > 1 && (
-          <nav className="pagination" aria-label="Pagination">
-            <button id="prev-page" className="page-btn"
-              disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-              ‹
-            </button>
-            {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
-              let p = i + 1;
-              if (totalPages > 7) {
-                if (page <= 4) p = i + 1;
-                else if (page >= totalPages - 3) p = totalPages - 6 + i;
-                else p = page - 3 + i;
-              }
-              return (
-                <button key={p} id={`page-${p}`}
-                  className={`page-btn ${page === p ? "active" : ""}`}
-                  onClick={() => setPage(p)}>
-                  {p}
-                </button>
-              );
-            })}
-            <button id="next-page" className="page-btn"
-              disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
-              ›
-            </button>
-          </nav>
-        )}
-      </main>
+            <div className="filter-group">
+              <label className="filter-group-label">Job type</label>
+              <button
+                id="remote-toggle"
+                className={`filter-toggle ${remoteOnly ? "active" : ""}`}
+                onClick={() => setRemoteOnly(v => !v)}
+              >
+                🌍 Remote only
+              </button>
+            </div>
+          </div>
+        </aside>
+
+      </div>{/* end page-body */}
 
       {/* ── Footer ── */}
       <footer className="footer">
         <div className="container">
-          ⚡ DataJobs · Sources: Adzuna, Arbeitnow, RemoteOK ·{" "}
+          ⚡ DataJobs · Sources: Adzuna, Arbeitnow, RemoteOK, Jooble, SerpAPI ·{" "}
           <span style={{ color: "var(--text-muted)" }}>Updated every 4 hours</span>
         </div>
       </footer>
