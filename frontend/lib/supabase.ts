@@ -37,6 +37,7 @@ export type JobFilters = {
   role?: string;
   days?: number;
   location?: string;
+  country?: string;      // precise country filter — uses ', Country' pattern
   remote?: boolean;
   experience?: string;
   page?: number;
@@ -44,9 +45,55 @@ export type JobFilters = {
 
 const PAGE_SIZE = 20;
 
+/**
+ * Location keywords for each country chip.
+ * Includes the country name itself PLUS all states/territories/major cities
+ * that appear in job location strings WITHOUT explicitly mentioning the country.
+ * e.g. "Ahmedabad, Gujarat" → matches India via "Gujarat"
+ */
+const COUNTRY_LOCATION_TERMS: Record<string, string[]> = {
+  "India": [
+    "India",
+    // States & Union Territories
+    "Gujarat", "Maharashtra", "Karnataka", "Tamil Nadu", "Telangana",
+    "Uttar Pradesh", "West Bengal", "Rajasthan", "Haryana", "Punjab",
+    "Madhya Pradesh", "Kerala", "Andhra Pradesh", "Bihar", "Odisha",
+    "Jharkhand", "Uttarakhand", "Assam", "Himachal Pradesh", "Goa",
+    "Chhattisgarh", "Tripura", "Manipur", "Meghalaya", "Nagaland",
+    // Major cities often listed without state
+    "Delhi", "Mumbai", "Bangalore", "Bengaluru", "Chennai", "Hyderabad",
+    "Pune", "Kolkata", "Ahmedabad", "Jaipur", "Noida", "Gurugram",
+    "Gurgaon", "Chandigarh", "Kochi", "Indore", "Bhopal", "Nagpur",
+    "Visakhapatnam", "Surat", "Vadodara", "Coimbatore", "Lucknow",
+    "Navi Mumbai", "Thane", "Mysuru", "Mysore", "Trivandrum",
+  ],
+  "United States": ["United States", "USA"],
+  "United Kingdom": ["United Kingdom", "England", "Scotland", "Wales"],
+  "Australia":      ["Australia"],
+  "Canada":         ["Canada"],
+  "Germany":        ["Germany"],
+  "Singapore":      ["Singapore"],
+  "UAE":            ["UAE", "Dubai", "Abu Dhabi", "Sharjah"],
+  "Netherlands":    ["Netherlands", "Holland"],
+  "remote":         ["Remote"],
+};
+
+/** Build a PostgREST .or() string for a country — comma-free patterns only */
+function buildCountryOrFilter(country: string): string {
+  const terms = COUNTRY_LOCATION_TERMS[country] ?? [country];
+  const parts: string[] = [];
+  for (const term of terms) {
+    parts.push(`location.ilike.${term}`);    // exact: "Gujarat"
+    parts.push(`location.ilike.% ${term}`);  // ends: "Ahmedabad, Gujarat"
+    parts.push(`location.ilike.${term} %`);  // starts: "Gujarat Remote"
+  }
+  return parts.join(",");
+}
+
+
 export async function fetchJobs(filters: JobFilters = {}): Promise<{ jobs: Job[]; total: number }> {
   const supabase = getSupabase();
-  const { q, role, days, location, remote, experience, page = 1 } = filters;
+  const { q, role, days, location, country, remote, experience, page = 1 } = filters;
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
@@ -70,6 +117,9 @@ export async function fetchJobs(filters: JobFilters = {}): Promise<{ jobs: Job[]
   if (location) {
     query = query.ilike("location", `%${location}%`);
   }
+  if (country) {
+    query = query.or(buildCountryOrFilter(country));
+  }
   if (remote) {
     query = query.contains("tags", ["remote"]);
   }
@@ -92,4 +142,64 @@ export async function fetchJob(id: string): Promise<Job | null> {
     .single();
   if (error) return null;
   return data as Job;
+}
+
+// ── Job Applications ─────────────────────────────────────────────────────────
+
+export type JobApplication = {
+  id?: string;
+  job_id: string;
+  company: string;
+  role: string;
+  tracking_link?: string;
+  applied_date: string;   // stored as YYYY-MM-DD in DB, displayed as DD/MM/YY
+  resume_name?: string;
+  status?: string;
+  email?: string;
+  ats?: string;
+  created_at?: string;
+};
+
+/** Convert ISO date (YYYY-MM-DD) → display format DD/MM/YY */
+export function isoToDisplay(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
+}
+
+export async function saveApplication(app: Omit<JobApplication, "id" | "created_at">): Promise<JobApplication | null> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("job_applications")
+    .insert([app])
+    .select()
+    .single();
+  if (error) {
+    console.error("saveApplication error — code:", error.code, "| message:", error.message, "| details:", error.details, "| hint:", error.hint);
+    return null;
+  }
+  return data as JobApplication;
+}
+
+export async function fetchApplications(): Promise<JobApplication[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("job_applications")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) { console.error("fetchApplications error:", error); return []; }
+  return (data as JobApplication[]) || [];
+}
+
+export async function updateApplication(id: string, updates: Partial<JobApplication>): Promise<void> {
+  const supabase = getSupabase();
+  await supabase.from("job_applications").update(updates).eq("id", id);
+}
+
+export async function deleteApplication(id: string): Promise<void> {
+  const supabase = getSupabase();
+  await supabase.from("job_applications").delete().eq("id", id);
 }

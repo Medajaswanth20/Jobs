@@ -11,12 +11,18 @@ APP_ID = os.environ.get("ADZUNA_APP_ID", "")
 APP_KEY = os.environ.get("ADZUNA_APP_KEY", "")
 
 SEARCH_TERMS = [
+    # Data roles
     "data analyst",
     "data integrity analyst",
     "data engineer",
     "analytics engineer",
     "business analyst data",
     "data quality analyst",
+    # DevOps / Cloud roles
+    "devops engineer",
+    "site reliability engineer",
+    "cloud engineer",
+    "platform engineer",
 ]
 
 # Countries to fetch from (add/remove as needed)

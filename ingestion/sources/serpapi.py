@@ -12,8 +12,9 @@ from typing import Iterator
 API_KEY  = os.environ.get("SERPAPI_KEY", "")
 BASE_URL = "https://serpapi.com/search.json"
 
-# Search queries targeting Data Analyst / Data Integrity roles in India
+# Search queries targeting Data + DevOps roles in India
 QUERIES = [
+    # Data roles
     "data analyst jobs in India",
     "data integrity analyst India",
     "data quality analyst India",
@@ -21,6 +22,12 @@ QUERIES = [
     "analytics engineer India",
     "business analyst data India",
     "data analyst remote India",
+    # DevOps / Cloud roles
+    "devops engineer jobs India",
+    "site reliability engineer SRE India",
+    "cloud engineer AWS Azure GCP India",
+    "platform engineer kubernetes India",
+    "devops engineer remote",
 ]
 
 # SerpAPI Google Jobs returns ~10 results per page, paginated via `start` offset

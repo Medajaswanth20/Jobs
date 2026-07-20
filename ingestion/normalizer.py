@@ -12,6 +12,10 @@ ROLE_RULES = [
     ("analytics-engineer",  ["analytics engineer", "dbt", "analytics eng"]),
     ("business-analyst",    ["business analyst", "business intelligence", "bi analyst", "reporting analyst"]),
     ("data-scientist",      ["data scientist", "ml engineer", "machine learning", "mlops"]),
+    ("devops",              ["devops", "devsecops", "site reliability", "sre", "platform engineer",
+                             "infrastructure engineer", "systems reliability", "release engineer"]),
+    ("cloud-engineer",      ["cloud engineer", "cloud architect", "aws engineer", "azure engineer",
+                             "gcp engineer", "solutions architect", "cloud developer"]),
     ("data-analyst",        ["data analyst", "analyst"]),  # broad catch-all last
 ]
 
@@ -45,6 +49,11 @@ def tag_job(title: str, jd: str) -> list[str]:
         "contract": ["contract", "freelance"],
         "entry-level": ["entry level", "junior", "fresher", "0-2 years", "1-2 years"],
         "senior": ["senior", "lead", "principal", "sr."],
+        "kubernetes": ["kubernetes", "k8s"],
+        "docker":     ["docker", "container"],
+        "terraform":  ["terraform", "iac", "infrastructure as code"],
+        "ci-cd":      ["ci/cd", "cicd", "jenkins", "github actions", "gitlab ci", "circle ci"],
+        "linux":      ["linux", "unix", "bash", "shell script"],
     }
     for tag, keywords in tag_map.items():
         if any(kw in text for kw in keywords):
@@ -57,7 +66,7 @@ _EXPERIENCE_PATTERNS = [
     # Entry / Junior / Fresher
     ("entry", [
         r"\bentry[- ]level\b", r"\bjunior\b", r"\bjr\.?\b",
-        r"\bfresher\b", r"\bgraduate\b", r"\b0[- ]?(?:to|[-–])[- ]?[12][- ]?year",
+        r"\bfresher\b", r"\bgraduate\b", r"\b0(?!\d)[- ]?(?:to|[-\u2013])[- ]?[12][- ]?year",
         r"\bno experience\b", r"\bnew grad\b",
     ]),
     # Senior / Lead / Principal / Staff
@@ -77,12 +86,39 @@ _EXPERIENCE_PATTERNS = [
 
 
 def extract_experience(title: str, jd: str) -> str | None:
-    """Return 'entry', 'mid', or 'senior'; None if undetermined."""
-    text = (title + " " + jd).lower()
+    """Return 'entry', 'mid', or 'senior'; None if undetermined.
+
+    Uses a scoring approach so that strong signals (especially in the title)
+    override weaker ones.  A senior signal in the *title* always wins, because
+    a job posted as "Sr. Analyst" or "Technical Lead" is never entry-level
+    even if the JD body happens to mention "entry level applicants welcome".
+    """
+    title_lower = title.lower()
+    body_lower  = jd.lower()
+
+    scores: dict[str, int] = {"entry": 0, "mid": 0, "senior": 0}
+
     for level, patterns in _EXPERIENCE_PATTERNS:
-        if any(re.search(p, text) for p in patterns):
-            return level
-    return None
+        for p in patterns:
+            if re.search(p, title_lower):
+                scores[level] += 3          # title hit — high weight
+            elif re.search(p, body_lower):
+                scores[level] += 1          # body-only hit — lower weight
+
+    # No signal at all
+    if max(scores.values()) == 0:
+        return None
+
+    # Senior title signal is decisive — prevents "Sr. Lead" from being
+    # overridden by an "entry level" mention buried in the JD body.
+    senior_title_hit = any(
+        re.search(p, title_lower)
+        for p in _EXPERIENCE_PATTERNS[1][1]   # index 1 == senior
+    )
+    if senior_title_hit:
+        return "senior"
+
+    return max(scores, key=lambda k: scores[k])
 
 
 def _parse_date(raw) -> str | None:

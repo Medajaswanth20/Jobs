@@ -3,7 +3,8 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { fetchJobs, type Job, type JobFilters } from "@/lib/supabase";
+import { fetchJobs, type Job, type JobFilters, type JobApplication, saveApplication, fetchApplications, updateApplication, deleteApplication, isoToDisplay } from "@/lib/supabase";
+import * as XLSX from "xlsx";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -14,8 +15,66 @@ const ROLE_LABELS: Record<string, string> = {
   "analytics-engineer":  "Analytics Engineer",
   "data-scientist":      "Data Scientist",
   "business-analyst":    "Business Analyst",
+  "devops":              "DevOps / SRE",
+  "cloud-engineer":      "Cloud Engineer",
   "other":               "Other",
 };
+
+const SOURCE_META: Record<string, { label: string; icon: string }> = {
+  serpapi:   { label: "SerpApi",   icon: "🔍" },
+  linkedin:  { label: "LinkedIn",  icon: "💼" },
+  jsearch:   { label: "JSearch",   icon: "⚡" },
+  adzuna:    { label: "Adzuna",    icon: "🌐" },
+  arbeitnow: { label: "Arbeitnow", icon: "📋" },
+  remoteok:  { label: "RemoteOK",  icon: "🏠" },
+  jooble:    { label: "Jooble",    icon: "🔎" },
+};
+
+const PORTAL_HOST_MAP: [RegExp, { label: string; icon: string }][] = [
+  [/linkedin/,            { label: "LinkedIn",  icon: "💼" }],
+  [/naukri/,              { label: "Naukri",    icon: "🇮🇳" }],
+  [/foundit|monster/,     { label: "Foundit",   icon: "🎯" }],
+  [/indeed/,              { label: "Indeed",    icon: "🔵" }],
+  [/glassdoor/,           { label: "Glassdoor", icon: "🪟" }],
+  [/shine\.com/,          { label: "Shine",     icon: "✨" }],
+  [/iimjobs/,             { label: "IIMJobs",   icon: "🎓" }],
+  [/instahyre/,           { label: "Instahyre", icon: "⚡" }],
+  [/internshala/,         { label: "Internshala",icon: "🎒" }],
+  [/cutshort/,            { label: "Cutshort",  icon: "✂️" }],
+  [/wellfound|angel/,     { label: "Wellfound", icon: "👼" }],
+  [/ziprecruiter/,        { label: "ZipRecruiter",icon:"📮" }],
+  [/simplyhired/,         { label: "SimplyHired",icon:"📄" }],
+  [/jobsdb/,              { label: "JobsDB",    icon: "🗄️" }],
+  [/workday/,             { label: "Workday",   icon: "🏢" }],
+  [/lever\.co/,           { label: "Lever",     icon: "🔧" }],
+  [/greenhouse/,          { label: "Greenhouse",icon: "🌿" }],
+  [/smartrecruiters/,     { label: "SmartRecruit",icon:"🤝" }],
+];
+
+const STATUS_OPTIONS = ["Applied", "Review", "Interview", "Rejected", "Offer"];
+
+function getPortalFromUrl(url: string): { label: string; icon: string } | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    for (const [pattern, meta] of PORTAL_HOST_MAP) {
+      if (pattern.test(host)) return meta;
+    }
+  } catch { /* invalid URL */ }
+  return null;
+}
+
+function SourceChip({ source, applyUrl }: { source: string; applyUrl?: string }) {
+  const key = (source || "").toLowerCase();
+  const isAggregator = ["serpapi", "jsearch"].includes(key);
+  const portalFromUrl = isAggregator ? getPortalFromUrl(applyUrl || "") : null;
+  const meta = portalFromUrl ?? SOURCE_META[key];
+  return (
+    <span className="card-source-chip" data-source={portalFromUrl ? portalFromUrl.label.toLowerCase() : key}>
+      {meta ? `${meta.icon} ${meta.label}` : source}
+    </span>
+  );
+}
 
 const DATE_OPTIONS = [
   { label: "Any time",    value: 0 },
@@ -25,10 +84,23 @@ const DATE_OPTIONS = [
 ];
 
 const EXPERIENCE_OPTIONS = [
-  { label: "All Levels",  value: "" },
-  { label: "🌱 Entry Level", value: "entry" },
-  { label: "🔶 Mid Level",  value: "mid" },
-  { label: "🚀 Senior",     value: "senior" },
+  { label: "All Levels",          value: "" },
+  { label: "🌱 Entry (0–2 yrs)",  value: "entry" },
+  { label: "🔶 Mid (2–5 yrs)",    value: "mid" },
+  { label: "🚀 Senior (5+ yrs)",  value: "senior" },
+];
+
+const COUNTRY_CHIPS = [
+  { flag: "🇮🇳", label: "India",         value: "India" },
+  { flag: "🇺🇸", label: "USA",           value: "United States" },
+  { flag: "🇬🇧", label: "UK",            value: "United Kingdom" },
+  { flag: "🇦🇺", label: "Australia",     value: "Australia" },
+  { flag: "🇨🇦", label: "Canada",        value: "Canada" },
+  { flag: "🇩🇪", label: "Germany",       value: "Germany" },
+  { flag: "🇸🇬", label: "Singapore",     value: "Singapore" },
+  { flag: "🇦🇪", label: "UAE",           value: "UAE" },
+  { flag: "🇳🇱", label: "Netherlands",   value: "Netherlands" },
+  { flag: "🇷🇪", label: "Remote",        value: "remote" },
 ];
 
 function timeAgo(dateStr: string): string {
@@ -39,6 +111,10 @@ function timeAgo(dateStr: string): string {
   if (d < 7)  return `${d}d ago`;
   if (d < 30) return `${Math.floor(d / 7)}w ago`;
   return `${Math.floor(d / 30)}mo ago`;
+}
+
+function formatDateISO(d: Date): string {
+  return d.toISOString().split("T")[0]; // YYYY-MM-DD for Supabase
 }
 
 function companyInitial(company: string): string {
@@ -77,7 +153,11 @@ function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
     ? job.jd_text.replace(/<[^>]+>/g, " ").slice(0, 200).trim()
     : "";
 
-  const expLabel: Record<string, string> = { entry: "🌱 Entry", mid: "🔶 Mid", senior: "🚀 Senior" };
+  const expLabel: Record<string, string> = {
+    entry:  "🌱 Entry · 0–2 yrs",
+    mid:    "🔶 Mid · 2–5 yrs",
+    senior: "🚀 Senior · 5+ yrs",
+  };
 
   return (
     <article className="job-card" onClick={onClick} tabIndex={0}
@@ -93,7 +173,7 @@ function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
           <h2 className="card-title">{job.title}</h2>
           <div className="card-company">{job.company}</div>
         </div>
-        <span className="card-source-chip">{job.source}</span>
+        <SourceChip source={job.source} applyUrl={job.apply_url} />
       </div>
 
       <div className="card-meta">
@@ -134,12 +214,58 @@ function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
   );
 }
 
-function JobDetail({ job, onClose }: { job: Job; onClose: () => void }) {
+// ── Job Detail with Resume Upload & Apply Tracking ────────────────────────────
+
+function JobDetail({
+  job,
+  onClose,
+  onApplied,
+}: {
+  job: Job;
+  onClose: () => void;
+  onApplied: () => void;
+}) {
+  const [resumeName, setResumeName] = useState("");
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const [applyError, setApplyError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) setResumeName(file.name);
+  }
+
+  async function handleMarkApplied() {
+    setApplying(true);
+    setApplyError("");
+    const today = formatDateISO(new Date());
+    const roleLabel = ROLE_LABELS[job.role_category] || job.role_category;
+    const result = await saveApplication({
+      job_id: job.id,
+      company: job.company,
+      role: roleLabel,
+      tracking_link: job.apply_url || "",
+      applied_date: today,
+      resume_name: resumeName || "",
+      status: "Applied",
+      email: "",
+      ats: "",
+    });
+    setApplying(false);
+    if (result) {
+      setApplied(true);
+      onApplied();
+    } else {
+      setApplyError("Failed to save. Check Supabase table exists.");
+    }
+  }
 
   return (
     <div className="detail-overlay" onClick={onClose}>
@@ -150,7 +276,7 @@ function JobDetail({ job, onClose }: { job: Job; onClose: () => void }) {
           <span className={`badge badge-${job.role_category}`}>
             {ROLE_LABELS[job.role_category] || job.role_category}
           </span>
-          <span className="card-source-chip">{job.source}</span>
+          <SourceChip source={job.source} applyUrl={job.apply_url} />
           {(job.tags || []).map(tag => <span key={tag} className="tag">{tag}</span>)}
         </div>
 
@@ -182,14 +308,243 @@ function JobDetail({ job, onClose }: { job: Job; onClose: () => void }) {
             : "No job description available."}
         </div>
 
-        {job.apply_url && (
-          <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className="apply-btn">
-            Apply Now
+        {/* ── Resume Upload + Apply Section ── */}
+        <div className="apply-section">
+          <div className="resume-upload-row">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              style={{ display: "none" }}
+              onChange={handleFileChange}
+              id="resume-file-input"
+            />
+            <button
+              className="resume-upload-btn"
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              {resumeName ? "Change Resume" : "Upload Resume"}
+            </button>
+            {resumeName && (
+              <span className="resume-name-pill">
+                📄 {resumeName}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            {job.apply_url && (
+              <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className="apply-btn">
+                Apply Now
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+            )}
+
+            {applied ? (
+              <span className="applied-badge">✅ Saved to Tracker!</span>
+            ) : (
+              <button
+                className="mark-applied-btn"
+                onClick={handleMarkApplied}
+                disabled={applying}
+                type="button"
+              >
+                {applying ? (
+                  <>
+                    <span className="btn-spinner" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Mark as Applied
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          {applyError && <p style={{ color: "#f87171", fontSize: 13, marginTop: 8 }}>{applyError}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Applications Tracker Modal ────────────────────────────────────────────────
+
+function ApplicationsModal({ onClose }: { onClose: () => void }) {
+  const [apps, setApps] = useState<JobApplication[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  useEffect(() => {
+    fetchApplications().then(data => { setApps(data); setLoading(false); });
+  }, []);
+
+  async function handleCellEdit(id: string, field: keyof JobApplication, value: string) {
+    setApps(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+    await updateApplication(id, { [field]: value });
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Remove this entry from the tracker?")) return;
+    await deleteApplication(id);
+    setApps(prev => prev.filter(a => a.id !== id));
+  }
+
+  function downloadExcel() {
+    const rows = apps.map(a => ({
+      Company:        a.company,
+      "Tracking link": a.tracking_link || "",
+      Role:           a.role,
+      "Applied date": isoToDisplay(a.applied_date),
+      ID:             a.job_id,
+      Resume:         a.resume_name || "",
+      Status:         a.status || "",
+      Email:          a.email || "",
+      ATS:            a.ats || "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Column widths
+    ws["!cols"] = [
+      { wch: 22 }, { wch: 35 }, { wch: 20 }, { wch: 14 },
+      { wch: 14 }, { wch: 38 }, { wch: 12 }, { wch: 26 }, { wch: 14 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Job Applications");
+    XLSX.writeFile(wb, `Job_Applications_${isoToDisplay(new Date().toISOString().split("T")[0]).replace(/\//g, "-")}.xlsx`);
+
+  }
+
+  return (
+    <div className="tracker-overlay" onClick={onClose}>
+      <div className="tracker-modal" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="tracker-header">
+          <div>
+            <h2 className="tracker-title">📋 My Applications</h2>
+            <p className="tracker-subtitle">
+              {apps.length} application{apps.length !== 1 ? "s" : ""} tracked
+            </p>
+          </div>
+          <button className="detail-close" onClick={onClose} aria-label="Close modal">✕</button>
+        </div>
+
+        {/* Table */}
+        <div className="tracker-table-wrap">
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text-muted)" }}>
+              Loading…
+            </div>
+          ) : apps.length === 0 ? (
+            <div className="tracker-empty">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                <rect x="9" y="3" width="6" height="4" rx="2" ry="2"/>
+              </svg>
+              <p>No applications yet. Click <strong>Mark as Applied</strong> on any job to start tracking!</p>
+            </div>
+          ) : (
+            <table className="tracker-table">
+              <thead>
+                <tr>
+                  <th>Company</th>
+                  <th>Tracking Link</th>
+                  <th>Role</th>
+                  <th>Applied Date</th>
+                  <th>ID</th>
+                  <th>Resume</th>
+                  <th>Status</th>
+                  <th>Email</th>
+                  <th>ATS</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {apps.map(app => (
+                  <tr key={app.id}>
+                    <td className="td-company">{app.company}</td>
+                    <td className="td-link">
+                      {app.tracking_link ? (
+                        <a href={app.tracking_link} target="_blank" rel="noopener noreferrer" className="tracker-link">
+                          🔗 Link
+                        </a>
+                      ) : "—"}
+                    </td>
+                    <td>{app.role}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{isoToDisplay(app.applied_date)}</td>
+                    <td className="td-id">{app.job_id}</td>
+                    <td className="td-resume">{app.resume_name || "—"}</td>
+                    <td>
+                      <select
+                        className="tracker-status-select"
+                        value={app.status || "Applied"}
+                        data-status={(app.status || "applied").toLowerCase()}
+                        onChange={e => handleCellEdit(app.id!, "status", e.target.value)}
+                      >
+                        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        className="tracker-cell-input"
+                        value={app.email || ""}
+                        placeholder="email received"
+                        onChange={e => handleCellEdit(app.id!, "email", e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="tracker-cell-input"
+                        value={app.ats || ""}
+                        placeholder="ATS used"
+                        onChange={e => handleCellEdit(app.id!, "ats", e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <button
+                        className="tracker-delete-btn"
+                        onClick={() => handleDelete(app.id!)}
+                        title="Remove entry"
+                      >
+                        🗑
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        <div className="tracker-footer">
+          <button className="tracker-close-btn" onClick={onClose}>Close</button>
+          <button className="tracker-download-btn" onClick={downloadExcel} disabled={apps.length === 0}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-          </a>
-        )}
+            Download Excel
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -203,17 +558,25 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [showTracker, setShowTracker] = useState(false);
+  const [appCount, setAppCount] = useState(0);
 
   const [searchRaw, setSearchRaw] = useState("");
   const [role, setRole] = useState("");
   const [days, setDays] = useState(0);
   const [locationFilter, setLocationFilter] = useState("");
+  const [countryFilter, setCountryFilter] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [experience, setExperience] = useState("");
 
   const search = useDebounce(searchRaw, 400);
   const PAGE_SIZE = 20;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  // Load app count on mount
+  useEffect(() => {
+    fetchApplications().then(data => setAppCount(data.length));
+  }, []);
 
   const load = useCallback(async (pg: number) => {
     setLoading(true);
@@ -223,7 +586,9 @@ export default function HomePage() {
       if (role) filters.role = role;
       if (days) filters.days = days;
       if (locationFilter) filters.location = locationFilter;
+      if (countryFilter) filters.country = countryFilter;
       if (remoteOnly) filters.remote = true;
+
       if (experience) filters.experience = experience;
       const { jobs: data, total: count } = await fetchJobs(filters);
       setJobs(data);
@@ -233,21 +598,29 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [search, role, days, locationFilter, remoteOnly, experience]);
+  }, [search, role, days, locationFilter, countryFilter, remoteOnly, experience]);
+
 
   useEffect(() => {
     setPage(1);
     load(1);
-  }, [search, role, days, locationFilter, remoteOnly, experience]);  // eslint-disable-line
+  }, [search, role, days, locationFilter, countryFilter, remoteOnly, experience]);  // eslint-disable-line
+
 
   useEffect(() => {
     if (page !== 1) load(page);
   }, [page]);  // eslint-disable-line
 
-  const hasFilters = !!(search || role || days || locationFilter || remoteOnly || experience);
+  const hasFilters = !!(search || role || days || locationFilter || countryFilter || remoteOnly || experience);
+
 
   function clearFilters() {
-    setSearchRaw(""); setRole(""); setDays(0); setLocationFilter(""); setRemoteOnly(false); setExperience("");
+    setSearchRaw(""); setRole(""); setDays(0); setLocationFilter(""); setCountryFilter(""); setRemoteOnly(false); setExperience("");
+  }
+
+
+  function handleApplied() {
+    setAppCount(c => c + 1);
   }
 
   return (
@@ -256,9 +629,19 @@ export default function HomePage() {
       <header className="header">
         <div className="container header-inner">
           <span className="logo">⚡ DataJobs</span>
-          <span className="header-meta">
-            Updated every 4 hours · {total.toLocaleString()} listings
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <span className="header-meta">
+              Updated every 4 hours · {total.toLocaleString()} listings
+            </span>
+            <button
+              id="open-tracker-btn"
+              className="tracker-header-btn"
+              onClick={() => setShowTracker(true)}
+            >
+              📋 My Applications
+              {appCount > 0 && <span className="tracker-badge">{appCount}</span>}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -345,6 +728,27 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* ── Country chips ── */}
+        <div className="country-chips-row">
+          <span className="country-chips-label">Country:</span>
+          {COUNTRY_CHIPS.map(c => (
+            <button
+              key={c.value}
+              id={`country-${c.value.toLowerCase().replace(/\s+/g, "-")}`}
+              className={`country-chip ${countryFilter === c.value ? "active" : ""}`}
+              onClick={() => {
+                const next = countryFilter === c.value ? "" : c.value;
+                setCountryFilter(next);
+                // Do NOT touch locationFilter — country uses a separate precise query
+              }}
+
+            >
+              <span className="chip-flag">{c.flag}</span>
+              {c.label}
+            </button>
+          ))}
+        </div>
+
         {/* ── Job Grid ── */}
         {loading ? (
           <div className="job-grid">
@@ -360,7 +764,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="job-grid">
-            {jobs.map((job, i) => (
+            {jobs.map((job) => (
               <JobCard
                 key={job.id}
                 job={job}
@@ -410,7 +814,16 @@ export default function HomePage() {
 
       {/* ── Job Detail Overlay ── */}
       {selectedJob && (
-        <JobDetail job={selectedJob} onClose={() => setSelectedJob(null)} />
+        <JobDetail
+          job={selectedJob}
+          onClose={() => setSelectedJob(null)}
+          onApplied={handleApplied}
+        />
+      )}
+
+      {/* ── Applications Tracker Modal ── */}
+      {showTracker && (
+        <ApplicationsModal onClose={() => setShowTracker(false)} />
       )}
     </>
   );
