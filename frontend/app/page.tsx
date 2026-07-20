@@ -3,7 +3,8 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { fetchJobs, type Job, type JobFilters, type JobApplication, saveApplication, fetchApplications, updateApplication, deleteApplication, isoToDisplay } from "@/lib/supabase";
+import { fetchJobs, type Job, type JobFilters, type JobApplication, saveApplication, fetchApplications, updateApplication, deleteApplication, isoToDisplay, getUser, onAuthChange, getUserPreferences, signOut } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -273,6 +274,7 @@ function JobDetail({
     setApplyError("");
     const today = formatDateISO(new Date());
     const roleLabel = ROLE_LABELS[job.role_category] || job.role_category;
+    const currentUser = await getUser();
     const result = await saveApplication({
       job_id: job.id,
       company: job.company,
@@ -283,6 +285,7 @@ function JobDetail({
       status: "Applied",
       email: "",
       ats: "",
+      ...(currentUser ? { user_id: currentUser.id } : {}),
     });
     setApplying(false);
     if (result) {
@@ -419,7 +422,9 @@ function ApplicationsModal({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   useEffect(() => {
-    fetchApplications().then(data => { setApps(data); setLoading(false); });
+    getUser().then(u => {
+      fetchApplications(u?.id).then(data => { setApps(data); setLoading(false); });
+    });
   }, []);
 
   async function handleCellEdit(id: string, field: keyof JobApplication, value: string) {
@@ -587,6 +592,10 @@ export default function HomePage() {
   const [showTracker, setShowTracker] = useState(false);
   const [appCount, setAppCount] = useState(0);
 
+  // Auth state
+  const [user, setUser] = useState<User | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
   const [searchRaw, setSearchRaw] = useState("");
   const [role, setRole] = useState("");
   const [days, setDays] = useState(0);
@@ -599,9 +608,37 @@ export default function HomePage() {
   const PAGE_SIZE = 20;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  // Load app count on mount
+  // Auth listener — fires on mount and whenever auth state changes
   useEffect(() => {
-    fetchApplications().then(data => setAppCount(data.length));
+    getUser().then(async u => {
+      setUser(u);
+      if (u) {
+        const prefs = await getUserPreferences(u.id);
+        if (prefs) {
+          if (prefs.preferred_role)       setRole(prefs.preferred_role);
+          if (prefs.preferred_country)    setCountryFilter(prefs.preferred_country);
+          if (prefs.preferred_experience) setExperience(prefs.preferred_experience);
+          if (prefs.remote_only)          setRemoteOnly(prefs.remote_only);
+        }
+        fetchApplications(u.id).then(data => setAppCount(data.length));
+      } else {
+        fetchApplications().then(data => setAppCount(data.length));
+      }
+    });
+    const sub = onAuthChange(async u => {
+      setUser(u);
+      if (u) {
+        const prefs = await getUserPreferences(u.id);
+        if (prefs) {
+          if (prefs.preferred_role)       setRole(prefs.preferred_role);
+          if (prefs.preferred_country)    setCountryFilter(prefs.preferred_country);
+          if (prefs.preferred_experience) setExperience(prefs.preferred_experience);
+          if (prefs.remote_only)          setRemoteOnly(prefs.remote_only);
+        }
+        fetchApplications(u.id).then(data => setAppCount(data.length));
+      }
+    });
+    return () => sub.unsubscribe();
   }, []);
 
   const load = useCallback(async (pg: number) => {
@@ -654,20 +691,55 @@ export default function HomePage() {
       {/* ── Header ── */}
       <header className="header">
         <div className="container header-inner">
-          <span className="logo">
-            <img src="/logo.png" alt="Job Hub Logo" style={{ height: 32, width: 32, borderRadius: 6, objectFit: "cover" }} />
-            Job Hub
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span className="header-meta">{total.toLocaleString()} listings · updated every 4h</span>
-            <button
-              id="open-tracker-btn"
-              className="tracker-header-btn"
-              onClick={() => setShowTracker(true)}
-            >
-              📋 My Applications
-              {appCount > 0 && <span className="tracker-badge">{appCount}</span>}
-            </button>
+          <div className="header-left">
+            <span className="logo">
+              <img src="/logo.png" alt="Job Hub Logo" style={{ height: 36, width: 36, borderRadius: 8, objectFit: "cover" }} />
+              Job Hub
+            </span>
+            <nav className="header-nav">
+              <span className="nav-link active">Find Jobs</span>
+              <button
+                id="open-tracker-btn"
+                className="nav-link-btn"
+                onClick={() => setShowTracker(true)}
+              >
+                My Applications
+                {appCount > 0 && <span className="tracker-badge-dot">{appCount}</span>}
+              </button>
+            </nav>
+          </div>
+          <div className="header-right">
+            <span className="header-meta" style={{ display: "none" }}>{total.toLocaleString()} active listings · updated every 4h</span>
+            {user ? (
+              <div className="user-menu">
+                <button
+                  id="user-avatar-btn"
+                  className="user-avatar-btn"
+                  onClick={() => setUserMenuOpen(o => !o)}
+                  aria-label="User menu"
+                >
+                  {user.email?.[0]?.toUpperCase() ?? "U"}
+                </button>
+                {userMenuOpen && (
+                  <div className="user-dropdown">
+                    <div className="user-dropdown-email">{user.email}</div>
+                    <a href="/preferences" className="user-dropdown-item" onClick={() => setUserMenuOpen(false)}>
+                      ⚙️ Preferences
+                    </a>
+                    <button
+                      className="user-dropdown-item danger"
+                      onClick={async () => { await signOut(); setUser(null); setUserMenuOpen(false); }}
+                    >
+                      🚪 Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <a href="/login" className="login-header-btn" id="header-login-btn">
+                Sign In
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -749,13 +821,30 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="job-list">
-              {jobs.map((job) => (
+              {(user ? jobs : jobs.slice(0, 5)).map((job) => (
                 <JobCard
                   key={job.id}
                   job={job}
                   onClick={() => setSelectedJob(job)}
                 />
               ))}
+              {/* Gated wall for non-logged-in users */}
+              {!user && jobs.length > 5 && (
+                <div className="gated-wall">
+                  <div className="gated-wall-blur" />
+                  <div className="gated-cta">
+                    <h3>🔒 {total.toLocaleString()} jobs available</h3>
+                    <p>
+                      You&apos;re seeing 5 of {total.toLocaleString()} matched jobs.<br />
+                      Sign in to see all results and get personalized recommendations.
+                    </p>
+                    <div className="gated-cta-btns">
+                      <a href="/login" className="gated-login-btn" id="gated-login-btn">Sign In</a>
+                      <a href="/login" className="gated-signup-btn" id="gated-signup-btn">Create Free Account</a>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
