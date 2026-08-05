@@ -122,6 +122,7 @@ function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
           <div className="card-header">
             <h2 className="card-title">{job.title}</h2>
           </div>
+          <span className="card-company-chip">{job.company}</span>
         </div>
 
         {/* Meta row */}
@@ -250,6 +251,7 @@ function JobDetail({
           <span className={`badge badge-${job.role_category}`}>
             {ROLE_LABELS[job.role_category] || job.role_category}
           </span>
+          <span className="card-company-chip">{job.company}</span>
           {(job.tags || []).map(tag => <span key={tag} className="tag">{tag}</span>)}
         </div>
 
