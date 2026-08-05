@@ -18,6 +18,9 @@ const ROLE_LABELS: Record<string, string> = {
   "business-analyst":    "Business Analyst",
   "devops":              "DevOps / SRE",
   "cloud-engineer":      "Cloud Engineer",
+  "backend":             "Backend Engineer",
+  "database-engineer":   "Database Engineer",
+  "database-analyst":    "Database Analyst",
   "other":               "Other",
 };
 

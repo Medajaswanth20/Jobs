@@ -522,6 +522,9 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .badge-business-analyst { background: #fefce8; color: #ca8a04; }
 .badge-devops           { background: #eff6ff; color: #2563eb; }
 .badge-cloud-engineer   { background: #ecfeff; color: #0891b2; }
+.badge-backend           { background: #f0fdf4; color: #15803d; }
+.badge-database-engineer { background: #eef2ff; color: #3730a3; }
+.badge-database-analyst  { background: #f0f9ff; color: #0369a1; }
 .badge-other            { background: #f3f4f6; color: #6b7280; }
 
 /* ── Filter Sidebar ── */
