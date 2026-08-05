@@ -6,8 +6,25 @@ import requests
 from typing import Iterator
 
 BASE_URL = "https://www.arbeitnow.com/api/job-board-api"
-KEYWORDS = ["data analyst", "data integrity", "data engineer", "analytics engineer",
-            "business analyst", "data quality", "bi analyst", "data science"]
+KEYWORDS = [
+    # Data roles
+    "data analyst", "data integrity", "data engineer", "analytics engineer",
+    "business analyst", "data quality", "bi analyst", "data science",
+    # Software Engineering
+    "software engineer", "software developer", "full stack", "fullstack",
+    "frontend engineer", "frontend developer", "backend engineer", "backend developer",
+    "react developer", "node developer", "python developer", "java developer",
+    # DevOps / Cloud
+    "devops", "site reliability", "sre", "cloud engineer", "platform engineer",
+    "kubernetes", "infrastructure engineer",
+    # Product & Design
+    "product manager", "product owner", "ui/ux", "ux designer", "ui designer",
+    "product designer", "interaction designer",
+    # Database roles
+    "database administrator", "dba", "sql developer", "database engineer",
+    "database analyst", "db analyst", "database developer", "database architect",
+    "postgresql developer", "mysql developer", "mongodb developer",
+]
 
 
 def fetch_jobs() -> Iterator[dict]:

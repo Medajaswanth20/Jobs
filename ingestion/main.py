@@ -11,7 +11,10 @@ try:
 except ImportError:
     pass
 
-from sources import arbeitnow, remoteok, adzuna, jooble, serpapi
+from sources import arbeitnow, remoteok, adzuna, jooble, remotive, themuse, jobicy
+# serpapi disabled — free tier (100 searches/month) exhausted.
+# Re-enable by upgrading to a paid SerpAPI plan and uncommenting below.
+# from sources import serpapi
 from normalizer import NORMALIZERS
 from deduper import compute_hash, dedupe_batch
 from upserter import get_existing_hashes, upsert_jobs, expire_old_jobs
@@ -21,7 +24,10 @@ SOURCES = [
     ("remoteok",  remoteok.fetch_jobs),
     ("adzuna",    adzuna.fetch_jobs),
     ("jooble",    jooble.fetch_jobs),
-    ("serpapi",   serpapi.fetch_jobs),  # Google Jobs → Naukri, LinkedIn, Indeed
+    # ("serpapi", serpapi.fetch_jobs),  # disabled — quota exhausted
+    ("remotive",  remotive.fetch_jobs),   # free, no key — remote tech roles
+    ("themuse",   themuse.fetch_jobs),    # free, no key — tech/PM/design
+    ("jobicy",    jobicy.fetch_jobs),     # free, no key — remote roles by tag
 ]
 
 
