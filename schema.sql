@@ -20,14 +20,21 @@ create table if not exists jobs (
   hash          text unique not null,  -- sha256(company+title+location) for dedup
   is_active     boolean default true,
   created_at    timestamptz default now(),
+  last_seen_at  timestamptz default now(),  -- refreshed every ingestion run the job is still returned by its source
   search_vector tsvector        -- populated by trigger below
 );
+
+-- 1b. Migration: adds last_seen_at to a jobs table created before this column existed.
+-- Safe to re-run; existing rows are backfilled to "seen now" so they get a
+-- fresh grace period instead of being expired immediately by expire_stale_jobs().
+alter table jobs add column if not exists last_seen_at timestamptz default now();
 
 -- 2. Indexes for performance
 create index if not exists jobs_posted_date_idx      on jobs (posted_date desc);
 create index if not exists jobs_role_category_idx    on jobs (role_category);
 create index if not exists jobs_experience_level_idx on jobs (experience_level);
 create index if not exists jobs_is_active_idx        on jobs (is_active);
+create index if not exists jobs_last_seen_at_idx     on jobs (last_seen_at);
 create index if not exists jobs_source_idx           on jobs (source);
 create index if not exists jobs_search_gin_idx       on jobs using gin(search_vector);
 create index if not exists jobs_tags_gin_idx      on jobs using gin(tags);
@@ -59,6 +66,20 @@ returns void as $$
   set is_active = false
   where is_active = true
     and posted_date < now() - interval '30 days';
+$$ language sql;
+
+-- 4b. Function to expire jobs that have quietly disappeared from their
+-- source's feed (closed/removed listings) instead of waiting the full
+-- 30 days. Source APIs only return currently-open postings, so a job
+-- missing from last_seen_at updates for a few runs in a row means it's
+-- gone. 3 days gives an 18-run buffer (ingestion runs every 4h) so a
+-- single flaky/rate-limited source run doesn't wrongly expire its jobs.
+create or replace function expire_stale_jobs()
+returns void as $$
+  update jobs
+  set is_active = false
+  where is_active = true
+    and last_seen_at < now() - interval '3 days';
 $$ language sql;
 
 -- 5. Enable Row Level Security (read-only for anon users)

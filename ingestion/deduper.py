@@ -23,12 +23,12 @@ def compute_hash(job: dict) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def dedupe_batch(jobs: list[dict], existing_hashes: set[str]) -> list[dict]:
+def dedupe_within_batch(jobs: list[dict]) -> list[dict]:
     """
-    Returns only jobs whose hash is NOT already in existing_hashes.
-    Also dedupes within the current batch itself.
+    Drops duplicate hashes within a single fetch run (e.g. the same job
+    posted on two sources). Keeps the first occurrence.
     """
-    seen = set(existing_hashes)
+    seen = set()
     result = []
     for job in jobs:
         h = job.get("hash") or compute_hash(job)

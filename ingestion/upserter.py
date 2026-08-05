@@ -50,6 +50,16 @@ def upsert_jobs(jobs: list[dict]) -> int:
 
 
 def expire_old_jobs() -> None:
-    """Calls the Postgres function to mark old jobs inactive."""
+    """Calls the Postgres function to mark jobs older than 30 days inactive."""
     client = get_client()
     client.rpc("expire_old_jobs").execute()
+
+
+def expire_stale_jobs() -> None:
+    """
+    Calls the Postgres function to mark jobs inactive once they've gone
+    missing from their source's feed for a few days (closed/removed
+    listings stop being returned by the source APIs).
+    """
+    client = get_client()
+    client.rpc("expire_stale_jobs").execute()
