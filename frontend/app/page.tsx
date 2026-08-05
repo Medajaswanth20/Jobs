@@ -21,61 +21,7 @@ const ROLE_LABELS: Record<string, string> = {
   "other":               "Other",
 };
 
-const SOURCE_META: Record<string, { label: string; icon: string }> = {
-  serpapi:   { label: "SerpApi",   icon: "🔍" },
-  linkedin:  { label: "LinkedIn",  icon: "💼" },
-  jsearch:   { label: "JSearch",   icon: "⚡" },
-  adzuna:    { label: "Adzuna",    icon: "🌐" },
-  arbeitnow: { label: "Arbeitnow", icon: "📋" },
-  remoteok:  { label: "RemoteOK",  icon: "🏠" },
-  jooble:    { label: "Jooble",    icon: "🔎" },
-};
-
-const PORTAL_HOST_MAP: [RegExp, { label: string; icon: string }][] = [
-  [/linkedin/,            { label: "LinkedIn",  icon: "💼" }],
-  [/naukri/,              { label: "Naukri",    icon: "🇮🇳" }],
-  [/foundit|monster/,     { label: "Foundit",   icon: "🎯" }],
-  [/indeed/,              { label: "Indeed",    icon: "🔵" }],
-  [/glassdoor/,           { label: "Glassdoor", icon: "🪟" }],
-  [/shine\.com/,          { label: "Shine",     icon: "✨" }],
-  [/iimjobs/,             { label: "IIMJobs",   icon: "🎓" }],
-  [/instahyre/,           { label: "Instahyre", icon: "⚡" }],
-  [/internshala/,         { label: "Internshala",icon: "🎒" }],
-  [/cutshort/,            { label: "Cutshort",  icon: "✂️" }],
-  [/wellfound|angel/,     { label: "Wellfound", icon: "👼" }],
-  [/ziprecruiter/,        { label: "ZipRecruiter",icon:"📮" }],
-  [/simplyhired/,         { label: "SimplyHired",icon:"📄" }],
-  [/jobsdb/,              { label: "JobsDB",    icon: "🗄️" }],
-  [/workday/,             { label: "Workday",   icon: "🏢" }],
-  [/lever\.co/,           { label: "Lever",     icon: "🔧" }],
-  [/greenhouse/,          { label: "Greenhouse",icon: "🌿" }],
-  [/smartrecruiters/,     { label: "SmartRecruit",icon:"🤝" }],
-];
-
 const STATUS_OPTIONS = ["Applied", "Review", "Interview", "Rejected", "Offer"];
-
-function getPortalFromUrl(url: string): { label: string; icon: string } | null {
-  if (!url) return null;
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    for (const [pattern, meta] of PORTAL_HOST_MAP) {
-      if (pattern.test(host)) return meta;
-    }
-  } catch { /* invalid URL */ }
-  return null;
-}
-
-function SourceChip({ source, applyUrl }: { source: string; applyUrl?: string }) {
-  const key = (source || "").toLowerCase();
-  const isAggregator = ["serpapi", "jsearch"].includes(key);
-  const portalFromUrl = isAggregator ? getPortalFromUrl(applyUrl || "") : null;
-  const meta = portalFromUrl ?? SOURCE_META[key];
-  return (
-    <span className="card-source-chip" data-source={portalFromUrl ? portalFromUrl.label.toLowerCase() : key}>
-      {meta ? `${meta.icon} ${meta.label}` : source}
-    </span>
-  );
-}
 
 const DATE_OPTIONS = [
   { label: "Any time",    value: 0 },
@@ -176,7 +122,6 @@ function JobCard({ job, onClick }: { job: Job; onClick: () => void }) {
           <div className="card-header">
             <h2 className="card-title">{job.title}</h2>
           </div>
-          <SourceChip source={job.source} applyUrl={job.apply_url} />
         </div>
 
         {/* Meta row */}
@@ -305,7 +250,6 @@ function JobDetail({
           <span className={`badge badge-${job.role_category}`}>
             {ROLE_LABELS[job.role_category] || job.role_category}
           </span>
-          <SourceChip source={job.source} applyUrl={job.apply_url} />
           {(job.tags || []).map(tag => <span key={tag} className="tag">{tag}</span>)}
         </div>
 
