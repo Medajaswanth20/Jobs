@@ -103,6 +103,37 @@ def tag_job(title: str, jd: str) -> list[str]:
     return tags
 
 
+# Explicit years-of-experience mentions ("over 8 years", "8+ years",
+# "at least 8 years", "5-9 years", "8 years of experience"). Checked
+# before the keyword patterns below because a specific YOE number is a
+# far more reliable signal than a stray keyword hit — e.g. a senior JD
+# that mentions mentoring "junior engineers" shouldn't be classified
+# as entry-level just because "junior" appears in the body.
+_YEARS_PATTERNS = [
+    r"(?:over|more than|at least|minimum(?:\s+of)?)\s+(\d{1,2})\+?\s*years?",
+    r"(\d{1,2})\+\s*years?",
+    r"(\d{1,2})\s*(?:-|–|to)\s*\d{1,2}\s*years?",
+    r"(\d{1,2})\s*years?\s+(?:of\s+)?(?:professional\s+|relevant\s+|industry\s+)?experience",
+]
+
+
+def _extract_years(text: str) -> int | None:
+    """Returns the highest explicit years-of-experience number mentioned, if any."""
+    years = []
+    for pattern in _YEARS_PATTERNS:
+        for m in re.finditer(pattern, text):
+            years.append(int(m.group(1)))
+    return max(years) if years else None
+
+
+def _bucket_years(n: int) -> str:
+    if n <= 2:
+        return "entry"
+    if n <= 4:
+        return "mid"
+    return "senior"
+
+
 # Experience-level patterns (checked in order — most specific first)
 _EXPERIENCE_PATTERNS = [
     # Entry / Junior / Fresher
@@ -137,6 +168,13 @@ def extract_experience(title: str, jd: str) -> str | None:
     """
     title_lower = title.lower()
     body_lower  = jd.lower()
+
+    # An explicit years-of-experience number is decisive — it beats any
+    # keyword hit, since keywords can appear in unrelated context (e.g.
+    # "mentors junior engineers" in an otherwise senior JD).
+    years = _extract_years(title_lower) or _extract_years(body_lower)
+    if years is not None:
+        return _bucket_years(years)
 
     scores: dict[str, int] = {"entry": 0, "mid": 0, "senior": 0}
 
